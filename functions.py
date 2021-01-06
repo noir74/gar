@@ -2,16 +2,26 @@ import zipfile
 import re
 import io
 import xml.sax
-import ConfigParser
+import configparser
 import sys
 
 
-def add_to_file(input_zip_file, files_to_fetch, output_plain_file):
+def process_config_file(conifg_file):
+    config = configparser.ConfigParser()
+    config.readfp(open(conifg_file, encoding='utf-8'))
+    for each_section in config.sections():
+        for (each_key, each_val) in config.items(each_section):
+            print(each_key)
+            print(each_val)
+
+
+def add_to_file(input_zip_file, output_plain_file):
     zip_data = zipfile.ZipFile(input_zip_file, 'r')
     file_list = zip_data.filelist
     output_plain_stream = open(output_plain_file, mode='a+', buffering=8192, encoding='utf-8')
 
     for FileRecord in file_list:
+        files_to_fetch = 'AS_STEADS'
         if re.match('^[0-9]{2}/' + files_to_fetch + '_[0-9]{8}_', FileRecord.filename) != 0:
             object_type = 'STEAD'
             attributes_list = 'ID,OBJECTID,OBJECTGUID,CHANGEID,NUMBER,OPERTYPEID,PREVID,NEXTID,UPDATEDATE,STARTDATE,ENDDATE,ISACTUAL,ISACTIVE'
