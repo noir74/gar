@@ -9,10 +9,18 @@ import sys
 def process_config_file(conifg_file):
     config = configparser.ConfigParser()
     config.readfp(open(conifg_file, encoding='utf-8'))
-    for each_section in config.sections():
-        for (each_key, each_val) in config.items(each_section):
-            print(each_key)
-            print(each_val)
+
+    input_file = config.get("Common", "input_file")
+    output_dir = config.get("Common", "output_dir")
+    xml_file_prefix = config.get("Common", "xml_file_prefix")
+    xml_file_suffix = config.get("Common", "xml_file_suffix")
+    field_separator = config.get("Common", "field_separator")
+
+    for section in config.sections():
+        if section != 'Common' and config.get(section, "process") == 'yes':
+            xml_file_mask = config.get(section, "xml_file_mask")
+            xml_tag_name = config.get(section, "xml_file_mask")
+            xml_tag_attributes = config.get(section, "xml_file_mask")
 
 
 def add_to_file(input_zip_file, output_plain_file):
