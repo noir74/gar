@@ -1,6 +1,5 @@
 import zipfile
 import re
-import parse_xml
 import io
 import xml.sax
 import sys
@@ -16,7 +15,7 @@ def get_objects(input_zip_file, files_to_fetch):
             separator = '<>'
 
             input_xml_stream = io.BytesIO(ZipData.read(FileRecord.filename))
-            parse_xml.process_objects(object_type, object_attributes, separator, input_xml_stream)
+            process_objects(object_type, object_attributes, separator, input_xml_stream)
 
     ZipData.close()
 
@@ -40,7 +39,5 @@ def process_objects(object_type, object_attributes, separator, input_data):
 
     parser_instance = xml.sax.make_parser()
     parser_instance.setContentHandler(MovieHandler())
-
-    # parser_instance.parse(sys.stdin)
     parser_instance.parse(input_data)
 

@@ -1,4 +1,3 @@
-import parse_xml
 import read_zip
 
 object_type = 'STEAD'
