@@ -2,13 +2,14 @@ import zipfile
 import re
 import io
 import xml.sax
+import ConfigParser
 import sys
 
 
 def add_to_file(input_zip_file, files_to_fetch, output_plain_file):
     zip_data = zipfile.ZipFile(input_zip_file, 'r')
     file_list = zip_data.filelist
-    output_plain_stream = open(output_plain_file, mode='a+', buffering=8192,encoding='utf-8')
+    output_plain_stream = open(output_plain_file, mode='a+', buffering=8192, encoding='utf-8')
 
     for FileRecord in file_list:
         if re.match('^[0-9]{2}/' + files_to_fetch + '_[0-9]{8}_', FileRecord.filename) != 0:
