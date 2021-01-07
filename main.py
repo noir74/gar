@@ -5,7 +5,7 @@ import io
 import xml.sax
 
 
-def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream, source_file):
+def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream):
     class MovieHandler(xml.sax.ContentHandler):
 
         # Call when an element starts
@@ -21,7 +21,7 @@ def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_str
 
                     output_string = output_string + attribute_value + field_separator
 
-                output_plain_stream.writelines(source_file + ': ' + output_string + '\n')
+                output_plain_stream.writelines(output_string + '\n')
 
     parser_instance = xml.sax.make_parser()
     parser_instance.setContentHandler(MovieHandler())
@@ -38,7 +38,7 @@ def process_xml_type(xml_file, xml_tag, xml_attributes):
 
         if match:
             input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
-            process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream, FileRecord.filename)
+            process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream)
 
     output_plain_stream.close()
     zip_data.close()
