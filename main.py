@@ -4,7 +4,7 @@ import re
 import io
 import xml.sax
 from threading import Thread
-import codesc
+import codecs
 
 def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream):
     class MovieHandler(xml.sax.ContentHandler):
@@ -20,7 +20,7 @@ def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_str
                     else:
                         attribute_value = ''
 
-                    output_string = output_string + attribute_value + field_separator
+                    output_string = output_string + attribute_value + FieldSeparator
 
                 output_plain_stream.writelines(output_string + '\n')
 
@@ -30,12 +30,11 @@ def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_str
 
 
 def process_xml_type(xml_file, xml_tag, xml_attributes):
-    zip_data = zipfile.ZipFile(input_file, 'r')
-    archive_file_list = zip_data.filelist
-    output_plain_stream = codesc.open(output_dir + '/' + xml_file + '.out', mode='a+', buffering=8192, encoding='utf-8')
+    zip_data = zipfile.ZipFile(InputFile, 'r')
+    output_plain_stream = codecs.open(OutputDir + '/' + xml_file + '.out', mode='a+', buffering=8192, encoding='utf-8')
 
-    for FileRecord in archive_file_list:
-        match = re.match(xml_file_prefix + xml_file + xml_file_suffix, FileRecord.filename)
+    for FileRecord in ArchiveFileList:
+        match = re.match(XmlFilePrefix + xml_file + XmlFileSuffix, FileRecord.filename)
 
         if match:
             input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
@@ -61,16 +60,21 @@ def process_config_file(config):
     for thread in threads:
         thread.join()
 
-# config_file = sys.argv[1]
-config_file = 'Z:/garbage/tmp/gar/util/gar2.config'
+# ConfigFile = sys.argv[1]
+ConfigFile = 'Z:/garbage/tmp/gar/util/gar2.config'
 
 config = configparser.ConfigParser()
-config.readfp(codesc.open(config_file, encoding='utf-8'))
+config.readfp(codecs.open(ConfigFile, encoding='utf-8'))
 
-input_file = config.get("Common", "input_file")
-output_dir = config.get("Common", "output_dir")
-xml_file_prefix = config.get("Common", "xml_file_prefix")
-xml_file_suffix = config.get("Common", "xml_file_suffix")
-field_separator = config.get("Common", "field_separator")
+InputFile = config.get("Common", "input_file")
+OutputDir = config.get("Common", "output_dir")
+XmlFilePrefix = config.get("Common", "xml_file_prefix")
+XmlFileSuffix = config.get("Common", "xml_file_suffix")
+FieldSeparator = config.get("Common", "field_separator")
+
+ZipData = zipfile.ZipFile(InputFile, 'r')
+ArchiveFileList = ZipData.filelist
 
 process_config_file(config)
+
+ZipData.close()
