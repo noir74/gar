@@ -49,9 +49,9 @@ def process_config_file(config):
     procs = []
     for section in config.sections():
         if section != 'Common' and config.get(section, "process") == 'yes':
-            xml_file = config.get(section, "xml_file")
-            xml_tag = config.get(section, "xml_tag")
-            xml_attributes = config.get(section, "xml_attributes").split(',')
+            xml_file = GarConfig.get(section, "xml_file")
+            xml_tag = GarConfig.get(section, "xml_tag")
+            xml_attributes = GarConfig.get(section, "xml_attributes").split(',')
             #process_xml_type(xml_file, xml_tag, xml_attributes)
             proc = Process(target=process_xml_type, args=(xml_file, xml_tag, xml_attributes,))
             procs.append(proc)
@@ -65,21 +65,21 @@ def process_config_file(config):
 # ConfigFile = sys.argv[1]
 ConfigFile = 'Z:/garbage/tmp/gar/util/gar2.config'
 
-config = configparser.ConfigParser()
-config.readfp(codecs.open(ConfigFile, encoding='utf-8'))
+GarConfig = configparser.ConfigParser()
+GarConfig.readfp(codecs.open(ConfigFile, encoding='utf-8'))
 
-InputFile = config.get("Common", "input_file")
-OutputDir = config.get("Common", "output_dir")
-XmlFilePrefix = config.get("Common", "xml_file_prefix")
-XmlFileSuffix = config.get("Common", "xml_file_suffix")
-FieldSeparator = config.get("Common", "field_separator")
+InputFile = GarConfig.get("Common", "input_file")
+OutputDir = GarConfig.get("Common", "output_dir")
+XmlFilePrefix = GarConfig.get("Common", "xml_file_prefix")
+XmlFileSuffix = GarConfig.get("Common", "xml_file_suffix")
+FieldSeparator = GarConfig.get("Common", "field_separator")
 
 ZipData = zipfile.ZipFile(InputFile, 'r')
 ArchiveFileList = ZipData.filelist
 
 if __name__ == '__main__':
     start = time.time()
-    process_config_file(config)
+    process_config_file(GarConfig)
     end = time.time()
     print('Time taken in seconds: ', end - start)
 
