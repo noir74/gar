@@ -2,26 +2,15 @@ import zipfile
 import re
 import io
 import xml.sax
-import configparser
-import sys
+import main
 
-
-def process_config_file(conifg_file):
-    config = configparser.ConfigParser()
-    config.readfp(open(conifg_file, encoding='utf-8'))
-
-    input_file = config.get("Common", "input_file")
-    output_dir = config.get("Common", "output_dir")
-    xml_file_prefix = config.get("Common", "xml_file_prefix")
-    xml_file_suffix = config.get("Common", "xml_file_suffix")
-    field_separator = config.get("Common", "field_separator")
-
+def process_config_file(config):
     for section in config.sections():
         if section != 'Common' and config.get(section, "process") == 'yes':
             xml_file_mask = config.get(section, "xml_file_mask")
             xml_tag_name = config.get(section, "xml_file_mask")
             xml_tag_attributes = config.get(section, "xml_file_mask")
-
+            print(section)
 
 def add_to_file(input_zip_file, output_plain_file):
     zip_data = zipfile.ZipFile(input_zip_file, 'r')
@@ -34,16 +23,16 @@ def add_to_file(input_zip_file, output_plain_file):
             object_type = 'STEAD'
             attributes_list = 'ID,OBJECTID,OBJECTGUID,CHANGEID,NUMBER,OPERTYPEID,PREVID,NEXTID,UPDATEDATE,STARTDATE,ENDDATE,ISACTUAL,ISACTIVE'
             object_attributes = attributes_list.split(',')
-            separator = '<>'
+            field_separator = '<>'
 
             input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
-            parse_xml_data(object_type, object_attributes, separator, input_xml_stream, output_plain_stream)
+            parse_xml_data(object_type, object_attributes, field_separator, input_xml_stream, output_plain_stream)
 
     output_plain_stream.close()
     zip_data.close()
 
 
-def parse_xml_data(object_type, object_attributes, separator, input_xml_stream, output_plain_stream):
+def parse_xml_data(object_type, object_attributes, field_separator, input_xml_stream, output_plain_stream):
     class MovieHandler(xml.sax.ContentHandler):
 
         # Call when an element starts
@@ -57,7 +46,7 @@ def parse_xml_data(object_type, object_attributes, separator, input_xml_stream, 
                     else:
                         attribute_value = ''
 
-                    output_string = output_string + attribute_value + separator
+                    output_string = output_string + attribute_value + field_separator
 
                 print(output_string)
                 output_plain_stream.writelines(output_string + '\n')
