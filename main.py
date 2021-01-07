@@ -3,7 +3,8 @@ import zipfile
 import re
 import io
 import xml.sax
-from threading import Thread
+from multiprocessing import Process
+import time
 import codecs
 
 def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream):
@@ -45,20 +46,21 @@ def process_xml_type(xml_file, xml_tag, xml_attributes):
 
 
 def process_config_file(config):
-    threads = []
+    procs = []
     for section in config.sections():
         if section != 'Common' and config.get(section, "process") == 'yes':
             xml_file = config.get(section, "xml_file")
             xml_tag = config.get(section, "xml_tag")
             xml_attributes = config.get(section, "xml_attributes").split(',')
             #process_xml_type(xml_file, xml_tag, xml_attributes)
-            threads.append(Thread(target=process_xml_type, args=(xml_file, xml_tag, xml_attributes)))
+            proc = Process(target=process_xml_type, args=(xml_file, xml_tag, xml_attributes,))
+            procs.append(proc)
 
-    for thread in threads:
-        thread.start()
+    for proc in procs:
+        proc.start()
 
-    for thread in threads:
-        thread.join()
+    for proc in procs:
+        proc.join()
 
 # ConfigFile = sys.argv[1]
 ConfigFile = 'Z:/garbage/tmp/gar/util/gar2.config'
@@ -75,6 +77,10 @@ FieldSeparator = config.get("Common", "field_separator")
 ZipData = zipfile.ZipFile(InputFile, 'r')
 ArchiveFileList = ZipData.filelist
 
-process_config_file(config)
+if __name__ == '__main__':
+    start = time.time()
+    process_config_file(config)
+    end = time.time()
+    print('Time taken in seconds: ', end - start)
 
 ZipData.close()
