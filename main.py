@@ -7,6 +7,7 @@ from multiprocessing import Process
 import time
 import codecs
 
+
 def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream):
     class MovieHandler(xml.sax.ContentHandler):
 
@@ -30,12 +31,34 @@ def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_str
     parser_instance.parse(input_xml_stream)
 
 
-def process_xml_type(xml_file, xml_tag, xml_attributes):
+def process_xml_type(xml_file, xml_tag, xml_attributes, gar_config_section):
+    try:
+        xml_file_prefix = GarConfig.get(gar_config_section, "xml_file_prefix")
+    except configparser.NoOptionError:
+        xml_file_prefix = XmlFilePrefix
+
+    try:
+        xml_file_suffix = GarConfig.get(gar_config_section, "xml_file_suffix")
+    except configparser.NoOptionError:
+        xml_file_suffix = XmlFileSuffix
+
+    try:
+        output_file_mode = GarConfig.get(gar_config_section, "output_file_mode")
+    except configparser.NoOptionError:
+        output_file_mode = OutputFileMode
+
+    if output_file_mode == 'append':
+        output_file_mode = 'a'
+    elif output_file_mode == 'overwrite':
+        output_file_mode = 'w'
+
+    output_file_name = OutputDir + '/' + xml_file + '.out'
+
+    output_plain_stream = codecs.open(output_file_name, mode=output_file_mode, buffering=8192, encoding='utf-8')
     zip_data = zipfile.ZipFile(InputFile, 'r')
-    output_plain_stream = codecs.open(OutputDir + '/' + xml_file + '.out', mode='a+', buffering=8192, encoding='utf-8')
 
     for FileRecord in ArchiveFileList:
-        match = re.match(XmlFilePrefix + xml_file + XmlFileSuffix, FileRecord.filename)
+        match = re.match(xml_file_prefix + xml_file + xml_file_suffix, FileRecord.filename)
 
         if match:
             input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
@@ -47,13 +70,13 @@ def process_xml_type(xml_file, xml_tag, xml_attributes):
 
 def process_config_file(config):
     procs = []
-    for section in config.sections():
-        if section != 'Common' and config.get(section, "process") == 'yes':
-            xml_file = GarConfig.get(section, "xml_file")
-            xml_tag = GarConfig.get(section, "xml_tag")
-            xml_attributes = GarConfig.get(section, "xml_attributes").split(',')
-            #process_xml_type(xml_file, xml_tag, xml_attributes)
-            proc = Process(target=process_xml_type, args=(xml_file, xml_tag, xml_attributes,))
+    for gar_config_section in config.sections():
+        if gar_config_section != 'Common' and config.get(gar_config_section, "process") == 'yes':
+            xml_file = GarConfig.get(gar_config_section, "xml_file")
+            xml_tag = GarConfig.get(gar_config_section, "xml_tag")
+            xml_attributes = GarConfig.get(gar_config_section, "xml_attributes").split(',')
+            # process_xml_type(xml_file, xml_tag, xml_attributes, gar_config_section)
+            proc = Process(target=process_xml_type, args=(xml_file, xml_tag, xml_attributes, gar_config_section,))
             procs.append(proc)
 
     for proc in procs:
@@ -61,6 +84,7 @@ def process_config_file(config):
 
     for proc in procs:
         proc.join()
+
 
 # ConfigFile = sys.argv[1]
 ConfigFile = 'Z:/garbage/tmp/gar/util/gar2.config'
@@ -73,6 +97,7 @@ OutputDir = GarConfig.get("Common", "output_dir")
 XmlFilePrefix = GarConfig.get("Common", "xml_file_prefix")
 XmlFileSuffix = GarConfig.get("Common", "xml_file_suffix")
 FieldSeparator = GarConfig.get("Common", "field_separator")
+OutputFileMode = GarConfig.get("Common", "output_file_mode")
 
 ZipData = zipfile.ZipFile(InputFile, 'r')
 ArchiveFileList = ZipData.filelist
