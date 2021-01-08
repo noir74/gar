@@ -8,22 +8,73 @@ from multiprocessing import Process
 import time
 
 
-def process_xml_type(xml_file, xml_tag, xml_attributes, gar_config_section):
+class XmlTypeProcessingParameters:
+
+    def __init__(self, input_file, output_dir, xml_file_prefix, xml_file_suffix, field_separator, output_file_mode,
+                 xml_file, xml_tag, xml_attributes):
+        self.__input_file = input_file
+        self.__output_dir = output_dir
+        self.__xml_file_prefix = xml_file_prefix
+        self.__xml_file_suffix = xml_file_suffix
+        self.__field_separator = field_separator
+        self.__output_file_mode = output_file_mode
+        self.__xml_file = xml_file
+        self.__xml_tag = xml_tag
+        self.__xml_attributes = xml_attributes
+
+    @property
+    def input_file(self):
+        return self.__input_file
+
+    @property
+    def output_dir(self):
+        return self.__output_dir
+
+    @property
+    def xml_file_prefix(self):
+        return self.__xml_file_prefix
+
+    @property
+    def xml_file_suffix(self):
+        return self.__xml_file_suffix
+
+    @property
+    def field_separator(self):
+        return self.__field_separator
+
+    @property
+    def output_file_mode(self):
+        return self.__output_file_mode
+
+    @property
+    def xml_file(self):
+        return self.__xml_file
+
+    @property
+    def xml_tag(self):
+        return self.__xml_tag
+
+    @property
+    def xml_attributes(self):
+        return self.__xml_attributes
+
+
+def process_xml_type(proc_params):
     def process_xml_file():
         class MovieHandler(xml.sax.ContentHandler):
 
             # Call when an element starts
             def startElement(self, source_xml_tag, source_xml_attributes):
-                if source_xml_tag == xml_tag:
+                if source_xml_tag == proc_params.xml_tag:
                     output_string = ''
-                    for xml_attribute in xml_attributes:
+                    for xml_attribute in proc_params.xml_attributes:
 
                         if source_xml_attributes.get(xml_attribute) is not None:
                             attribute_value = source_xml_attributes.getValue(xml_attribute)
                         else:
                             attribute_value = ''
 
-                        output_string = output_string + attribute_value + FieldSeparator
+                        output_string = output_string + attribute_value + proc_params.field_separator
 
                     output_plain_stream.writelines(output_string + '\n')
 
@@ -31,57 +82,64 @@ def process_xml_type(xml_file, xml_tag, xml_attributes, gar_config_section):
         parser_instance.setContentHandler(MovieHandler())
         parser_instance.parse(input_xml_stream)
 
-    try:
-        xml_type_enabled = GarConfig.getboolean(gar_config_section, "enabled")
-    except configparser.NoOptionError:
-        xml_type_enabled = XmlTypeEnabled
+    output_file_name = proc_params.output_dir + '/' + proc_params.xml_file + '.out'
+    output_plain_stream = codecs.open(output_file_name, mode=proc_params.output_file_mode, buffering=8192,
+                                      encoding='utf-8')
 
-    if xml_type_enabled:
+    zip_data = zipfile.ZipFile(proc_params.input_file, 'r')
+    archive_file_list = zip_data.filelist
+
+    for FileRecord in archive_file_list:
+        match = re.match(
+            proc_params.xml_file_prefix + proc_params.xml_file + proc_params.xml_file_suffix,
+            FileRecord.filename)
+        if match:
+            input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
+            process_xml_file()
+
+    output_plain_stream.close()
+    zip_data.close()
+
+
+def process_config_file(config_file):
+    def get_config_parameter(section, parameter_name):
         try:
-            xml_file_prefix = GarConfig.get(gar_config_section, "xml_file_prefix")
+            parameter_value = gar_config_file.get(section, parameter_name)
         except configparser.NoOptionError:
-            xml_file_prefix = XmlFilePrefix
+            parameter_value = gar_config_file.get('Common', parameter_name)
+        return parameter_value
 
+    def if_xml_type_enabled(section):
         try:
-            xml_file_suffix = GarConfig.get(gar_config_section, "xml_file_suffix")
+            parameter_value = gar_config_file.getboolean(section, 'enabled')
         except configparser.NoOptionError:
-            xml_file_suffix = XmlFileSuffix
+            parameter_value = gar_config_file.getboolean('Common', 'enabled')
+        return parameter_value
 
-        try:
-            output_file_mode = GarConfig.get(gar_config_section, "output_file_mode")
-        except configparser.NoOptionError:
-            output_file_mode = OutputFileMode
-
-        if output_file_mode == 'append':
-            output_file_mode = 'a'
-        elif output_file_mode == 'overwrite':
-            output_file_mode = 'w'
-
-        output_file_name = OutputDir + '/' + xml_file + '.out'
-
-        output_plain_stream = codecs.open(output_file_name, mode=output_file_mode, buffering=8192, encoding='utf-8')
-        zip_data = zipfile.ZipFile(InputFile, 'r')
-
-        for FileRecord in ArchiveFileList:
-            match = re.match(xml_file_prefix + xml_file + xml_file_suffix, FileRecord.filename)
-
-            if match:
-                input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
-                process_xml_file()
-
-        output_plain_stream.close()
-        zip_data.close()
-
-
-def process_config_file(config):
     procs = []
-    for gar_config_section in config.sections():
-        if gar_config_section != 'Common':
-            xml_file = GarConfig.get(gar_config_section, "xml_file")
-            xml_tag = GarConfig.get(gar_config_section, "xml_tag")
-            xml_attributes = GarConfig.get(gar_config_section, "xml_attributes").split(',')
-            # process_xml_type(xml_file, xml_tag, xml_attributes, gar_config_section)
-            proc = Process(target=process_xml_type, args=(xml_file, xml_tag, xml_attributes, gar_config_section,))
+
+    gar_config_file = configparser.ConfigParser()
+    gar_config_file.readfp(codecs.open(config_file, encoding='utf-8'))
+
+    for gar_config_section in gar_config_file.sections():
+        if gar_config_section != 'Common' and if_xml_type_enabled(gar_config_section):
+            input_file = get_config_parameter(gar_config_section, "input_file")
+            output_dir = get_config_parameter(gar_config_section, "output_dir")
+            xml_file_prefix = get_config_parameter(gar_config_section, "xml_file_prefix")
+            xml_file_suffix = get_config_parameter(gar_config_section, "xml_file_suffix")
+            field_separator = get_config_parameter(gar_config_section, "field_separator")
+            output_file_mode = get_config_parameter(gar_config_section, "output_file_mode")
+            xml_file = get_config_parameter(gar_config_section, "xml_file")
+            xml_tag = get_config_parameter(gar_config_section, "xml_tag")
+            xml_attributes = get_config_parameter(gar_config_section, "xml_attributes").split(',')
+
+            processing_parameters = XmlTypeProcessingParameters(input_file, output_dir, xml_file_prefix,
+                                                                xml_file_suffix,
+                                                                field_separator, output_file_mode,
+                                                                xml_file, xml_tag, xml_attributes)
+
+            #process_xml_type(processing_parameters)
+            proc = Process(target=process_xml_type, args=(processing_parameters,))
             procs.append(proc)
 
     for proc in procs:
@@ -91,27 +149,9 @@ def process_config_file(config):
         proc.join()
 
 
-# ConfigFile = sys.argv[1]
-ConfigFile = 'Z:/garbage/tmp/gar/util/gar2.config'
-
-GarConfig = configparser.ConfigParser()
-GarConfig.readfp(codecs.open(ConfigFile, encoding='utf-8'))
-
-InputFile = GarConfig.get("Common", "input_file")
-OutputDir = GarConfig.get("Common", "output_dir")
-XmlFilePrefix = GarConfig.get("Common", "xml_file_prefix")
-XmlFileSuffix = GarConfig.get("Common", "xml_file_suffix")
-FieldSeparator = GarConfig.get("Common", "field_separator")
-OutputFileMode = GarConfig.get("Common", "output_file_mode")
-XmlTypeEnabled = GarConfig.getboolean("Common", "enabled")
-
-ZipData = zipfile.ZipFile(InputFile, 'r')
-ArchiveFileList = ZipData.filelist
-
 if __name__ == '__main__':
     start = time.time()
-    process_config_file(GarConfig)
+    process_config_file('Z:/garbage/tmp/gar/util/gar2.config')
+    # process_config_file(sys.argv[1])
     end = time.time()
     print('Time taken in seconds: ', end - start)
-
-ZipData.close()
