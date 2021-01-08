@@ -2,11 +2,10 @@ import configparser
 import zipfile
 import re
 import io
+import codecs
 import xml.sax
 from multiprocessing import Process
 import time
-import codecs
-
 
 def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream):
     class MovieHandler(xml.sax.ContentHandler):
@@ -33,45 +32,50 @@ def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_str
 
 def process_xml_type(xml_file, xml_tag, xml_attributes, gar_config_section):
     try:
-        xml_file_prefix = GarConfig.get(gar_config_section, "xml_file_prefix")
+        xml_type_enabled = GarConfig.getboolean(gar_config_section, "enabled")
     except configparser.NoOptionError:
-        xml_file_prefix = XmlFilePrefix
+        xml_type_enabled = XmlTypeEnabled
 
-    try:
-        xml_file_suffix = GarConfig.get(gar_config_section, "xml_file_suffix")
-    except configparser.NoOptionError:
-        xml_file_suffix = XmlFileSuffix
+    if xml_type_enabled:
+        try:
+            xml_file_prefix = GarConfig.get(gar_config_section, "xml_file_prefix")
+        except configparser.NoOptionError:
+            xml_file_prefix = XmlFilePrefix
 
-    try:
-        output_file_mode = GarConfig.get(gar_config_section, "output_file_mode")
-    except configparser.NoOptionError:
-        output_file_mode = OutputFileMode
+        try:
+            xml_file_suffix = GarConfig.get(gar_config_section, "xml_file_suffix")
+        except configparser.NoOptionError:
+            xml_file_suffix = XmlFileSuffix
 
-    if output_file_mode == 'append':
-        output_file_mode = 'a'
-    elif output_file_mode == 'overwrite':
-        output_file_mode = 'w'
+        try:
+            output_file_mode = GarConfig.get(gar_config_section, "output_file_mode")
+        except configparser.NoOptionError:
+            output_file_mode = OutputFileMode
 
-    output_file_name = OutputDir + '/' + xml_file + '.out'
+        if output_file_mode == 'append':
+            output_file_mode = 'a'
+        elif output_file_mode == 'overwrite':
+            output_file_mode = 'w'
 
-    output_plain_stream = codecs.open(output_file_name, mode=output_file_mode, buffering=8192, encoding='utf-8')
-    zip_data = zipfile.ZipFile(InputFile, 'r')
+        output_file_name = OutputDir + '/' + xml_file + '.out'
 
-    for FileRecord in ArchiveFileList:
-        match = re.match(xml_file_prefix + xml_file + xml_file_suffix, FileRecord.filename)
+        output_plain_stream = codecs.open(output_file_name, mode=output_file_mode, buffering=8192, encoding='utf-8')
+        zip_data = zipfile.ZipFile(InputFile, 'r')
 
-        if match:
-            input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
-            process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream)
+        for FileRecord in ArchiveFileList:
+            match = re.match(xml_file_prefix + xml_file + xml_file_suffix, FileRecord.filename)
 
-    output_plain_stream.close()
-    zip_data.close()
+            if match:
+                input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
+                process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream)
 
+        output_plain_stream.close()
+        zip_data.close()
 
 def process_config_file(config):
     procs = []
     for gar_config_section in config.sections():
-        if gar_config_section != 'Common' and config.get(gar_config_section, "process") == 'yes':
+        if gar_config_section != 'Common':
             xml_file = GarConfig.get(gar_config_section, "xml_file")
             xml_tag = GarConfig.get(gar_config_section, "xml_tag")
             xml_attributes = GarConfig.get(gar_config_section, "xml_attributes").split(',')
@@ -98,6 +102,7 @@ XmlFilePrefix = GarConfig.get("Common", "xml_file_prefix")
 XmlFileSuffix = GarConfig.get("Common", "xml_file_suffix")
 FieldSeparator = GarConfig.get("Common", "field_separator")
 OutputFileMode = GarConfig.get("Common", "output_file_mode")
+XmlTypeEnabled = GarConfig.getboolean("Common", "enabled")
 
 ZipData = zipfile.ZipFile(InputFile, 'r')
 ArchiveFileList = ZipData.filelist
