@@ -7,30 +7,30 @@ import xml.sax
 from multiprocessing import Process
 import time
 
-def process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream):
-    class MovieHandler(xml.sax.ContentHandler):
-
-        # Call when an element starts
-        def startElement(self, source_xml_tag, source_xml_attributes):
-            if source_xml_tag == xml_tag:
-                output_string = ''
-                for xml_attribute in xml_attributes:
-
-                    if source_xml_attributes.get(xml_attribute) is not None:
-                        attribute_value = source_xml_attributes.getValue(xml_attribute)
-                    else:
-                        attribute_value = ''
-
-                    output_string = output_string + attribute_value + FieldSeparator
-
-                output_plain_stream.writelines(output_string + '\n')
-
-    parser_instance = xml.sax.make_parser()
-    parser_instance.setContentHandler(MovieHandler())
-    parser_instance.parse(input_xml_stream)
-
 
 def process_xml_type(xml_file, xml_tag, xml_attributes, gar_config_section):
+    def process_xml_file():
+        class MovieHandler(xml.sax.ContentHandler):
+
+            # Call when an element starts
+            def startElement(self, source_xml_tag, source_xml_attributes):
+                if source_xml_tag == xml_tag:
+                    output_string = ''
+                    for xml_attribute in xml_attributes:
+
+                        if source_xml_attributes.get(xml_attribute) is not None:
+                            attribute_value = source_xml_attributes.getValue(xml_attribute)
+                        else:
+                            attribute_value = ''
+
+                        output_string = output_string + attribute_value + FieldSeparator
+
+                    output_plain_stream.writelines(output_string + '\n')
+
+        parser_instance = xml.sax.make_parser()
+        parser_instance.setContentHandler(MovieHandler())
+        parser_instance.parse(input_xml_stream)
+
     try:
         xml_type_enabled = GarConfig.getboolean(gar_config_section, "enabled")
     except configparser.NoOptionError:
@@ -67,10 +67,11 @@ def process_xml_type(xml_file, xml_tag, xml_attributes, gar_config_section):
 
             if match:
                 input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
-                process_xml_file(xml_tag, xml_attributes, input_xml_stream, output_plain_stream)
+                process_xml_file()
 
         output_plain_stream.close()
         zip_data.close()
+
 
 def process_config_file(config):
     procs = []
