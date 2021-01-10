@@ -1,56 +1,143 @@
+import configparser
 import zipfile
 import re
 import io
+import codecs
 import xml.sax
-import main
+from multiprocessing import Pool
 
-def process_config_file(config):
-    for section in config.sections():
-        if section != 'Common' and config.get(section, "process") == 'yes':
-            xml_file_mask = config.get(section, "xml_file_mask")
-            xml_tag_name = config.get(section, "xml_file_mask")
-            xml_tag_attributes = config.get(section, "xml_file_mask")
-            print(section)
+class XmlTypeProcessingParameters:
 
-def add_to_file(input_zip_file, output_plain_file):
-    zip_data = zipfile.ZipFile(input_zip_file, 'r')
-    file_list = zip_data.filelist
-    output_plain_stream = open(output_plain_file, mode='a+', buffering=8192, encoding='utf-8')
+    def __init__(self, input_zip_file, output_dir, xml_file_search_prefix, xml_file_search_suffix, field_separator, output_file_mode,
+                 xml_file, xml_tag, xml_attributes):
+        self.__input_zip_file = input_zip_file
+        self.__output_dir = output_dir
+        self.__xml_file_search_prefix = xml_file_search_prefix
+        self.__xml_file_search_suffix = xml_file_search_suffix
+        self.__field_separator = field_separator
+        self.__output_file_mode = output_file_mode
+        self.__xml_file = xml_file
+        self.__xml_tag = xml_tag
+        self.__xml_attributes = xml_attributes
 
-    for FileRecord in file_list:
-        files_to_fetch = 'AS_STEADS'
-        if re.match('^[0-9]{2}/' + files_to_fetch + '_[0-9]{8}_', FileRecord.filename) != 0:
-            object_type = 'STEAD'
-            attributes_list = 'ID,OBJECTID,OBJECTGUID,CHANGEID,NUMBER,OPERTYPEID,PREVID,NEXTID,UPDATEDATE,STARTDATE,ENDDATE,ISACTUAL,ISACTIVE'
-            object_attributes = attributes_list.split(',')
-            field_separator = '<>'
+    @property
+    def input_zip_file(self):
+        return self.__input_zip_file
 
+    @property
+    def output_dir(self):
+        return self.__output_dir
+
+    @property
+    def xml_file_search_prefix(self):
+        return self.__xml_file_search_prefix
+
+    @property
+    def xml_file_search_suffix(self):
+        return self.__xml_file_search_suffix
+
+    @property
+    def field_separator(self):
+        return self.__field_separator
+
+    @property
+    def output_file_mode(self):
+        return self.__output_file_mode
+
+    @property
+    def xml_file(self):
+        return self.__xml_file
+
+    @property
+    def xml_tag(self):
+        return self.__xml_tag
+
+    @property
+    def xml_attributes(self):
+        return self.__xml_attributes
+
+
+def process_xml_type(proc_params):
+    def process_xml_file():
+        class MovieHandler(xml.sax.ContentHandler):
+
+            # Call when an element starts
+            def startElement(self, source_xml_tag, source_xml_attributes):
+                if source_xml_tag == proc_params.xml_tag:
+                    output_string = ''
+                    for xml_attribute in proc_params.xml_attributes:
+
+                        if source_xml_attributes.get(xml_attribute) is not None:
+                            attribute_value = source_xml_attributes.getValue(xml_attribute)
+                        else:
+                            attribute_value = ''
+
+                        output_string = output_string + attribute_value + proc_params.field_separator
+
+                    output_plain_stream.writelines(output_string + '\n')
+
+        parser_instance = xml.sax.make_parser()
+        parser_instance.setContentHandler(MovieHandler())
+        parser_instance.parse(input_xml_stream)
+
+    output_file_name = proc_params.output_dir + '/' + proc_params.xml_file + '.out'
+    output_plain_stream = codecs.open(output_file_name, mode=proc_params.output_file_mode, buffering=8192,
+                                      encoding='utf-8')
+
+    zip_data = zipfile.ZipFile(proc_params.input_zip_file, 'r')
+    archive_file_list = zip_data.filelist
+
+    for FileRecord in archive_file_list:
+        match = re.match(
+            proc_params.xml_file_search_prefix + proc_params.xml_file + proc_params.xml_file_search_suffix,
+            FileRecord.filename)
+        if match:
             input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
-            parse_xml_data(object_type, object_attributes, field_separator, input_xml_stream, output_plain_stream)
+            process_xml_file()
 
     output_plain_stream.close()
     zip_data.close()
 
 
-def parse_xml_data(object_type, object_attributes, field_separator, input_xml_stream, output_plain_stream):
-    class MovieHandler(xml.sax.ContentHandler):
+def process_config_file(config_file):
+    def get_config_parameter(section, parameter_name):
+        try:
+            parameter_value = gar_config_file.get(section, parameter_name)
+        except configparser.NoOptionError:
+            parameter_value = gar_config_file.get('Common', parameter_name)
+        return parameter_value
 
-        # Call when an element starts
-        def startElement(self, xml_tag, xml_attributes):
-            if xml_tag == object_type:
-                output_string = ''
-                for object_attribute in object_attributes:
+    def if_xml_type_enabled(section):
+        try:
+            parameter_value = gar_config_file.getboolean(section, 'enabled')
+        except configparser.NoOptionError:
+            parameter_value = gar_config_file.getboolean('Common', 'enabled')
+        return parameter_value
 
-                    if xml_attributes.get(object_attribute) is not None:
-                        attribute_value = xml_attributes.getValue(object_attribute)
-                    else:
-                        attribute_value = ''
+    gar_config_file = configparser.ConfigParser()
+    gar_config_file.readfp(codecs.open(config_file, encoding='utf-8'))
 
-                    output_string = output_string + attribute_value + field_separator
+    args = []
 
-                print(output_string)
-                output_plain_stream.writelines(output_string + '\n')
+    for gar_config_section in gar_config_file.sections():
+        if gar_config_section != 'Common' and if_xml_type_enabled(gar_config_section):
+            input_zip_file = get_config_parameter(gar_config_section, "input_zip_file")
+            output_dir = get_config_parameter(gar_config_section, "output_dir")
+            xml_file_search_prefix = get_config_parameter(gar_config_section, "xml_file_search_prefix")
+            xml_file_search_suffix = get_config_parameter(gar_config_section, "xml_file_search_suffix")
+            field_separator = get_config_parameter(gar_config_section, "field_separator")
+            output_file_mode = get_config_parameter(gar_config_section, "output_file_mode")
+            xml_file = get_config_parameter(gar_config_section, "xml_file")
+            xml_tag = get_config_parameter(gar_config_section, "xml_tag")
+            xml_attributes = get_config_parameter(gar_config_section, "xml_attributes").split(',')
 
-    parser_instance = xml.sax.make_parser()
-    parser_instance.setContentHandler(MovieHandler())
-    parser_instance.parse(input_xml_stream)
+            processing_parameters = XmlTypeProcessingParameters(input_zip_file, output_dir, xml_file_search_prefix,
+                                                                xml_file_search_suffix,
+                                                                field_separator, output_file_mode,
+                                                                xml_file, xml_tag, xml_attributes)
+
+            # process_xml_type(processing_parameters)
+            args.append(processing_parameters)
+
+    processes_pool = Pool(gar_config_file.getint('Common', 'processes'))
+    processes_pool.map(process_xml_type, args)
