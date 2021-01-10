@@ -6,23 +6,31 @@ import codecs
 import xml.sax
 from multiprocessing import Pool
 
+
 class XmlTypeProcessingParameters:
 
-    def __init__(self, input_zip_file, output_dir, xml_file_search_prefix, xml_file_search_suffix, field_separator, output_file_mode,
-                 xml_file, xml_tag, xml_attributes):
+    def __init__(self, input_zip_file, zip_region_folders_list, output_dir, xml_file_search_prefix,
+                 xml_file_search_suffix, field_separator, output_file_mode,
+                 xml_file, xml_file_type, xml_tag, xml_attributes):
         self.__input_zip_file = input_zip_file
+        self.__zip_region_folders_list = zip_region_folders_list
         self.__output_dir = output_dir
         self.__xml_file_search_prefix = xml_file_search_prefix
         self.__xml_file_search_suffix = xml_file_search_suffix
         self.__field_separator = field_separator
         self.__output_file_mode = output_file_mode
         self.__xml_file = xml_file
+        self.__xml_file_type = xml_file_type
         self.__xml_tag = xml_tag
         self.__xml_attributes = xml_attributes
 
     @property
     def input_zip_file(self):
         return self.__input_zip_file
+
+    @property
+    def zip_region_folders_list(self):
+        return self.__zip_region_folders_list
 
     @property
     def output_dir(self):
@@ -47,6 +55,10 @@ class XmlTypeProcessingParameters:
     @property
     def xml_file(self):
         return self.__xml_file
+
+    @property
+    def xml_file_type(self):
+        return self.__xml_file_type
 
     @property
     def xml_tag(self):
@@ -80,17 +92,22 @@ def process_xml_type(proc_params):
         parser_instance.setContentHandler(MovieHandler())
         parser_instance.parse(input_xml_stream)
 
-    output_file_name = proc_params.output_dir + '/' + proc_params.xml_file + '.out'
+    output_file_name = proc_params.output_dir + '/' + proc_params.xml_file + '.txt'
     output_plain_stream = codecs.open(output_file_name, mode=proc_params.output_file_mode, buffering=8192,
                                       encoding='utf-8')
 
     zip_data = zipfile.ZipFile(proc_params.input_zip_file, 'r')
     archive_file_list = zip_data.filelist
 
+    if proc_params.xml_file_type == 'data' and proc_params.zip_region_folders_list != '':
+        xml_file_search_prefix_final = '(' + proc_params.zip_region_folders_list.replace(',', '|') + ')/'
+    else:
+        xml_file_search_prefix_final = proc_params.xml_file_search_prefix
+
+    search_pattern = xml_file_search_prefix_final + proc_params.xml_file + proc_params.xml_file_search_suffix
+
     for FileRecord in archive_file_list:
-        match = re.match(
-            proc_params.xml_file_search_prefix + proc_params.xml_file + proc_params.xml_file_search_suffix,
-            FileRecord.filename)
+        match = re.match(search_pattern, FileRecord.filename)
         if match:
             input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
             process_xml_file()
@@ -99,7 +116,7 @@ def process_xml_type(proc_params):
     zip_data.close()
 
 
-def process_config_file(config_file):
+def process_config_file(config_file, zip_region_folders_list):
     def get_config_parameter(section, parameter_name):
         try:
             parameter_value = gar_config_file.get(section, parameter_name)
@@ -128,15 +145,17 @@ def process_config_file(config_file):
             field_separator = get_config_parameter(gar_config_section, "field_separator")
             output_file_mode = get_config_parameter(gar_config_section, "output_file_mode")
             xml_file = get_config_parameter(gar_config_section, "xml_file")
+            xml_file_type = gar_config_file.get(gar_config_section, "xml_file_type")
             xml_tag = get_config_parameter(gar_config_section, "xml_tag")
             xml_attributes = get_config_parameter(gar_config_section, "xml_attributes").split(',')
 
-            processing_parameters = XmlTypeProcessingParameters(input_zip_file, output_dir, xml_file_search_prefix,
+            processing_parameters = XmlTypeProcessingParameters(input_zip_file, zip_region_folders_list, output_dir,
+                                                                xml_file_search_prefix,
                                                                 xml_file_search_suffix,
                                                                 field_separator, output_file_mode,
-                                                                xml_file, xml_tag, xml_attributes)
+                                                                xml_file, xml_file_type, xml_tag, xml_attributes)
 
-            # process_xml_type(processing_parameters)
+            #process_xml_type(processing_parameters)
             args.append(processing_parameters)
 
     processes_pool = Pool(gar_config_file.getint('Common', 'processes'))
