@@ -28,6 +28,7 @@ class XmlTypeProcessingParameters:
         self.__xml_data_check_if_actual = xml_data_check_if_actual
         self.__xml_data_check_if_active = xml_data_check_if_active
         self.__xml_data_check_for_date = xml_data_check_for_date
+        self.__today = datetime.now()
 
     @property
     def input_zip_file(self):
@@ -85,6 +86,10 @@ class XmlTypeProcessingParameters:
     def xml_data_check_for_date(self):
         return self.__xml_data_check_for_date
 
+    @property
+    def today(self):
+        return self.__today
+
 
 def process_xml_type(proc_params):
     def process_xml_file():
@@ -93,16 +98,16 @@ def process_xml_type(proc_params):
             # Call when an element starts
             def startElement(self, source_xml_tag, source_xml_attributes):
                 if source_xml_tag == proc_params.xml_tag:
-                    if proc_params.xml_data_check_if_actual and source_xml_attributes.get('ISACTUAL') != 1:
+                    if proc_params.xml_data_check_if_actual and source_xml_attributes.get('ISACTUAL') != '1':
                         return
 
-                    if proc_params.xml_data_check_if_active and source_xml_attributes.get('ISACTIVE') != 1:
+                    if proc_params.xml_data_check_if_active and source_xml_attributes.get('ISACTIVE') != '1':
                         return
 
                     if proc_params.xml_data_check_for_date:
-                        start_date = datetime.strptime(source_xml_attributes.get('STARTDATE'),'%Y-%m-%d')
+                        start_date = datetime.strptime(source_xml_attributes.get('STARTDATE'), '%Y-%m-%d')
                         end_date = datetime.strptime(source_xml_attributes.get('ENDDATE'), '%Y-%m-%d')
-                        if not (start_date < datetime.now() < end_date):
+                        if not (start_date < proc_params.today < end_date):
                             return
 
                     output_string = ''
@@ -145,7 +150,7 @@ def process_xml_type(proc_params):
     zip_data.close()
 
 
-def process_config_file(config_file, data_type_to_process, zip_region_folders_list):
+def process_config_file(config_file, type_to_proceed, zip_region_folders_list):
     def get_config_parameter(section, parameter_name):
         try:
             parameter_value = gar_config_file.get(section, parameter_name)
@@ -153,7 +158,7 @@ def process_config_file(config_file, data_type_to_process, zip_region_folders_li
             parameter_value = gar_config_file.get('Common', parameter_name)
         return parameter_value
 
-    def check_boolean_config_parameter(section, parameter_name):
+    def get_boolean_config_parameter(section, parameter_name):
         try:
             parameter_value = gar_config_file.getboolean(section, parameter_name)
         except configparser.NoOptionError:
@@ -166,9 +171,9 @@ def process_config_file(config_file, data_type_to_process, zip_region_folders_li
     args = []
 
     for gar_config_section in gar_config_file.sections():
-        if gar_config_section != 'Common' and check_boolean_config_parameter(gar_config_section, 'enabled'):
+        if gar_config_section != 'Common' and get_boolean_config_parameter(gar_config_section, 'enabled'):
             xml_file_type = gar_config_file.get(gar_config_section, "xml_file_type")
-            if xml_file_type == data_type_to_process:
+            if xml_file_type == type_to_proceed:
                 input_zip_file = get_config_parameter(gar_config_section, "input_zip_file")
                 output_dir = get_config_parameter(gar_config_section, "output_dir")
                 xml_file_search_prefix = get_config_parameter(gar_config_section, "xml_file_search_prefix")
@@ -178,12 +183,12 @@ def process_config_file(config_file, data_type_to_process, zip_region_folders_li
                 xml_file = get_config_parameter(gar_config_section, "xml_file")
                 xml_tag = get_config_parameter(gar_config_section, "xml_tag")
                 xml_attributes = get_config_parameter(gar_config_section, "xml_attributes").split(',')
-                xml_data_check_if_actual = check_boolean_config_parameter(gar_config_section,
-                                                                          'xml_data_check_if_actual')
-                xml_data_check_if_active = check_boolean_config_parameter(gar_config_section,
-                                                                          'xml_data_check_if_active')
-                xml_data_check_for_date = check_boolean_config_parameter(gar_config_section,
-                                                                         'xml_data_check_for_date')
+                xml_data_check_if_actual = get_boolean_config_parameter(gar_config_section,
+                                                                        'xml_data_check_if_actual')
+                xml_data_check_if_active = get_boolean_config_parameter(gar_config_section,
+                                                                        'xml_data_check_if_active')
+                xml_data_check_for_date = get_boolean_config_parameter(gar_config_section,
+                                                                       'xml_data_check_for_date')
 
                 processing_parameters = XmlTypeProcessingParameters(input_zip_file, zip_region_folders_list, output_dir,
                                                                     xml_file_search_prefix,
@@ -193,8 +198,8 @@ def process_config_file(config_file, data_type_to_process, zip_region_folders_li
                                                                     xml_data_check_if_actual, xml_data_check_if_active,
                                                                     xml_data_check_for_date)
 
-                # process_xml_type(processing_parameters)
+                process_xml_type(processing_parameters)
                 args.append(processing_parameters)
 
-    processes_pool = Pool(gar_config_file.getint('Common', 'processes'))
-    processes_pool.map(process_xml_type, args)
+    #processes_pool = Pool(gar_config_file.getint('Common', 'processes'))
+    #processes_pool.map(process_xml_type, args)
