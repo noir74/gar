@@ -94,7 +94,6 @@ class XmlTypeProcessingParameters:
 def process_xml_type(proc_params):
     def process_xml_file():
         class MovieHandler(xml.sax.ContentHandler):
-
             # Call when an element starts
             def startElement(self, source_xml_tag, source_xml_attributes):
                 if source_xml_tag == proc_params.xml_tag:
