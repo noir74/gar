@@ -197,8 +197,8 @@ def process_config_file(config_file, type_to_proceed, zip_region_folders_list):
                                                                     xml_data_check_if_actual, xml_data_check_if_active,
                                                                     xml_data_check_for_date)
 
-                process_xml_type(processing_parameters)
+                # process_xml_type(processing_parameters)
                 args.append(processing_parameters)
 
-    #processes_pool = Pool(gar_config_file.getint('Common', 'processes'))
-    #processes_pool.map(process_xml_type, args)
+    processes_pool = Pool(gar_config_file.getint('Common', 'processes'))
+    processes_pool.map(process_xml_type, args)
