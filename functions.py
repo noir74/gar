@@ -4,6 +4,7 @@ import re
 import io
 import codecs
 import xml.sax
+import time
 from datetime import datetime, date
 from multiprocessing import Pool
 
@@ -13,7 +14,7 @@ class XmlTypeProcessingParameters:
     def __init__(self, input_zip_file, zip_region_folders_list, output_dir, xml_file_search_prefix,
                  xml_file_search_suffix, field_separator, output_file_mode,
                  xml_file, xml_file_type, xml_tag, xml_attributes, xml_data_check_if_actual, xml_data_check_if_active,
-                 xml_data_check_for_date):
+                 xml_data_check_if_expired):
         self.__input_zip_file = input_zip_file
         self.__zip_region_folders_list = zip_region_folders_list
         self.__output_dir = output_dir
@@ -27,7 +28,7 @@ class XmlTypeProcessingParameters:
         self.__xml_attributes = xml_attributes
         self.__xml_data_check_if_actual = xml_data_check_if_actual
         self.__xml_data_check_if_active = xml_data_check_if_active
-        self.__xml_data_check_for_date = xml_data_check_for_date
+        self.__xml_data_check_if_expired = xml_data_check_if_expired
         self.__today = datetime.now()
 
     @property
@@ -83,8 +84,8 @@ class XmlTypeProcessingParameters:
         return self.__xml_data_check_if_active
 
     @property
-    def xml_data_check_for_date(self):
-        return self.__xml_data_check_for_date
+    def xml_data_check_if_expired(self):
+        return self.__xml_data_check_if_expired
 
     @property
     def today(self):
@@ -103,7 +104,7 @@ def process_xml_type(proc_params):
                     if proc_params.xml_data_check_if_active and source_xml_attributes.get('ISACTIVE') != '1':
                         return
 
-                    if proc_params.xml_data_check_for_date:
+                    if proc_params.xml_data_check_if_expired:
                         start_date = datetime.strptime(source_xml_attributes.get('STARTDATE'), '%Y-%m-%d')
                         end_date = datetime.strptime(source_xml_attributes.get('ENDDATE'), '%Y-%m-%d')
                         if not (start_date < proc_params.today < end_date):
@@ -125,6 +126,7 @@ def process_xml_type(proc_params):
         parser_instance.setContentHandler(MovieHandler())
         parser_instance.parse(input_xml_stream)
 
+    start = time.time()
     output_file_name = proc_params.output_dir + '/' + proc_params.xml_file + '.txt'
     output_plain_stream = codecs.open(output_file_name, mode=proc_params.output_file_mode, buffering=8192,
                                       encoding='utf-8')
@@ -143,10 +145,14 @@ def process_xml_type(proc_params):
         match = re.match(search_pattern, FileRecord.filename)
         if match:
             input_xml_stream = io.BytesIO(zip_data.read(FileRecord.filename))
+            #print('begin: ' + FileRecord.filename)
             process_xml_file()
+            #print('end: ' + FileRecord.filename)
 
     output_plain_stream.close()
     zip_data.close()
+    end = time.time()
+    print(proc_params.xml_file + ', sec: ', end - start)
 
 
 def process_config_file(config_file, type_to_proceed, zip_region_folders_list):
@@ -186,8 +192,8 @@ def process_config_file(config_file, type_to_proceed, zip_region_folders_list):
                                                                         'xml_data_check_if_actual')
                 xml_data_check_if_active = get_boolean_config_parameter(gar_config_section,
                                                                         'xml_data_check_if_active')
-                xml_data_check_for_date = get_boolean_config_parameter(gar_config_section,
-                                                                       'xml_data_check_for_date')
+                xml_data_check_if_expired = get_boolean_config_parameter(gar_config_section,
+                                                                       'xml_data_check_if_expired')
 
                 processing_parameters = XmlTypeProcessingParameters(input_zip_file, zip_region_folders_list, output_dir,
                                                                     xml_file_search_prefix,
@@ -195,9 +201,9 @@ def process_config_file(config_file, type_to_proceed, zip_region_folders_list):
                                                                     field_separator, output_file_mode,
                                                                     xml_file, xml_file_type, xml_tag, xml_attributes,
                                                                     xml_data_check_if_actual, xml_data_check_if_active,
-                                                                    xml_data_check_for_date)
+                                                                    xml_data_check_if_expired)
 
-                # process_xml_type(processing_parameters)
+                #process_xml_type(processing_parameters)
                 args.append(processing_parameters)
 
     processes_pool = Pool(gar_config_file.getint('Common', 'processes'))
