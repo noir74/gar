@@ -203,6 +203,7 @@ def process_config_file(config_file, type_to_proceed, zip_region_folders_list):
                                                                     xml_data_check_if_actual, xml_data_check_if_active,
                                                                     xml_data_check_if_expired)
 
+                # для вычислений без multithreading
                 #process_xml_type(processing_parameters)
                 args.append(processing_parameters)
 
